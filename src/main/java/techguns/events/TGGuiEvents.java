@@ -12,6 +12,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.EnumHand;
+import net.minecraft.util.EnumHandSide;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -23,15 +25,23 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import techguns.TGItems;
 import techguns.TGRadiationSystem;
 import techguns.Techguns;
+import techguns.api.guns.GunHandType;
 import techguns.api.guns.GunManager;
 import techguns.api.radiation.TGRadiation;
+import techguns.api.render.IItemRenderer;
 import techguns.capabilities.TGExtendedPlayer;
+import techguns.client.ClientProxy;
+import techguns.client.render.GLStateSnapshot;
+import techguns.client.render.ItemRenderHack;
+import techguns.client.render.item.RenderGunBase;
 import techguns.debug.Keybinds;
+import techguns.entities.projectiles.EnumBulletFirePos;
 import techguns.gui.player.TGGuiTabButton;
 import techguns.gui.player.TGPlayerInventory;
 import techguns.gui.player.TGPlayerInventoryGui;
 import techguns.items.additionalslots.ItemTGSpecialSlotAmmo;
 import techguns.items.armors.PoweredArmor;
+import techguns.items.guns.EnumCrosshairStyle;
 import techguns.items.guns.GenericGun;
 import techguns.util.InventoryUtil;
 import techguns.util.MathUtil;
@@ -39,6 +49,7 @@ import techguns.util.MathUtil;
 public class TGGuiEvents extends Gui{
 
 	public static ResourceLocation crosshairs_texture = new ResourceLocation(Techguns.MODID,"textures/gui/crosshairs.png");
+	public static ResourceLocation tg_crosshairs_texture = new ResourceLocation(Techguns.MODID,"textures/gui/tg_crosshairs.png");
 	
 	@SideOnly(Side.CLIENT)
 	@SubscribeEvent(priority=EventPriority.NORMAL, receiveCanceled=false)
@@ -156,7 +167,7 @@ public class TGGuiEvents extends Gui{
 			byte mode=0;
 			for(int i=0;i<4;i++){
 				ItemStack armor=ply.inventory.armorInventory.get(i);
-				if(armor!=null){
+				if(!armor.isEmpty()){
 					double dur = ((armor.getMaxDamage()-armor.getItemDamage())*1.0D)/(armor.getMaxDamage()*1.0D);
 					if (dur<0.35D && mode<1){
 						mode=1;
@@ -256,15 +267,21 @@ public class TGGuiEvents extends Gui{
 	@SideOnly(Side.CLIENT)
 	@SubscribeEvent(priority=EventPriority.NORMAL, receiveCanceled=false)
 	public void onRenderCrosshairs(RenderGameOverlayEvent event){
-		if(event.isCancelable() || event.getType() != ElementType.CROSSHAIRS)
+		if(event.isCanceled() || event.getType() != ElementType.CROSSHAIRS)
 	    {      
 	      return;
 	    }
 		
 		Minecraft mc = Minecraft.getMinecraft();
 		EntityPlayer player = mc.player;
+				
 		//if (player.getActiveItemStack().getItem() instanceof GenericGun) {
 		if (player.getHeldItemMainhand().getItem() instanceof GenericGun) {
+			
+			//check 1st person
+			if(mc.gameSettings.thirdPersonView != 0) {
+				return;
+			}
 			
 			/*
 			 * Render Lock on GUI effect
@@ -273,30 +290,37 @@ public class TGGuiEvents extends Gui{
 			ScaledResolution sr = new ScaledResolution(mc);
 			TGExtendedPlayer epc = TGExtendedPlayer.get(player);
 			
+			int x = sr.getScaledWidth() / 2;
+			int y = sr.getScaledHeight() / 2;
+			
 			//GenericGun gun = (GenericGun)player.getActiveItemStack().getItem();
 			GenericGun gun = (GenericGun)player.getHeldItemMainhand().getItem();
 			if (gun.getLockOnTicks() > 0 && epc.lockOnEntity != null && epc.lockOnTicks > 0) {
+				event.setCanceled(true);
+				
 				float maxTicks = (float)gun.getLockOnTicks(); //TODO: Store in capabilities
 				float progress = (float)epc.lockOnTicks/maxTicks;
 				
 				mc.getTextureManager().bindTexture(crosshairs_texture);
-				
+							
 				//GlStateManager.blendFunc(1, 0);
 				GlStateManager.disableBlend();
+				GlStateManager.enableAlpha();
 				
 //				float offset = (Math.max(0.0f, (1.0f-progress)*16.0f))+3.5f;
 //				float x = (float)(sr.getScaledWidth_double()*0.5);
 //				float y = (float)(sr.getScaledHeight_double()*0.5);
 				
 				int offset = (int)(Math.max(0.0f, (1.0f-progress)*16.0f))+5;
-				int x = sr.getScaledWidth() / 2;
-				int y = sr.getScaledHeight() / 2;
 				//Outer parts
 				
 				this.drawTexturedModalRect(x-offset-3, y-offset-3, 0, 0, 7,7);
 				this.drawTexturedModalRect(x+offset-3, y-offset-3, 7, 0, 7,7);
 				this.drawTexturedModalRect(x-offset-3, y+offset-3, 14, 0, 7,7);
 				this.drawTexturedModalRect(x+offset-3, y+offset-3, 21, 0, 7,7);
+				
+				//draw center dot
+				this.drawTexturedModalRect(x, y, 0, 0, 1, 1);
 				
 				if (progress < 1.0f) {
 					String text = "Locking... : "+epc.lockOnEntity.getName();
@@ -316,15 +340,134 @@ public class TGGuiEvents extends Gui{
 				
 				//Restore settings
 				GlStateManager.enableBlend();
+				GlStateManager.disableAlpha();
+				
 //				if (!(gamesettings.showDebugInfo && !gamesettings.hideGUI && !player.hasReducedDebug() && !gamesettings.reducedDebugInfo))
 //	            {
 //	                GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR, GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
 //	                GlStateManager.enableAlpha();
 //	            }
-			}
-
-		}
+			} else {
+				//gun crosshair
+				if(gun.isZooming()) {
+					IItemRenderer irenderer = ItemRenderHack.getRendererForItem(gun);
+					if(irenderer!=null && irenderer instanceof RenderGunBase) {
+						RenderGunBase rgun = (RenderGunBase) irenderer;
+						
+						if(rgun.hasScopeTexture()) {
+							event.setCanceled(true);
+							return;
+						}
+					}
+				}
+				
+					if(gun.getCrossHairStyle()!=EnumCrosshairStyle.VANILLA) {
+						event.setCanceled(true);
 		
+						//Vanilla does this setting too
+					    Minecraft.getMinecraft().getTextureManager().bindTexture(tg_crosshairs_texture);
+					    GlStateManager.enableBlend();
+		
+		                GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR, GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+		                GlStateManager.enableAlpha();
+		                //end vanilla gl states
+		                
+		                //this.drawTexturedModalRect(l / 2 - 7, i1 / 2 - 7, 0, 0, 16, 16);
+						
+		                float spread = gun.getSpread();
+		                
+		            	if(player.isActiveItemStackBlocking()) {
+			        		if(gun.getHandType()==GunHandType.ONE_HANDED) {
+			        			spread *= 4.0f;
+			        		} else {
+			        			spread *= 8.0f;
+			        		}
+			        	}
+			        	if(gun.isZooming()){
+			        		spread*=gun.getZoombonus();
+			        	}
+		              	
+			        	//System.out.println("Spread:"+spread);
+			        	
+		                int spacing = MathUtil.clamp(Math.round(100*spread),1,10);
+		                
+		                if (gun.getCrossHairStyle()==EnumCrosshairStyle.GUN_DYNAMIC) {
+		                 
+			                this.drawTexturedModalRect(x - (4+spacing) , y,3,7,4,1);
+			                this.drawTexturedModalRect(x + (1+spacing) , y,8,7,4,1);
+			                this.drawTexturedModalRect(x , y,7,7,1,1);
+			                
+			                this.drawTexturedModalRect(x, y - (4+spacing), 7, 3, 1,4);
+			                this.drawTexturedModalRect(x, y + (1+spacing), 7, 8, 1,4);
+			                
+		                } else {
+		                	EnumCrosshairStyle crosshair = gun.getCrossHairStyle();
+		                	
+		                	switch(crosshair.dynamicType) {
+								case BOTH:
+									//draw the center
+									this.drawTexturedModalRect(x-1, y-1, crosshair.getLocX()+6, crosshair.getLocY()+6, 3, 3);
+									
+									this.drawTexturedModalRect(x-6-spacing, y-2, crosshair.getLocX(), crosshair.getLocY()+5, 6, 5);
+									this.drawTexturedModalRect(x+1+spacing, y-2, crosshair.getLocX()+9, crosshair.getLocY()+5, 6, 5);
+									
+									this.drawTexturedModalRect(x-2, y-6-spacing, crosshair.getLocX()+5, crosshair.getLocY(), 5, 6);
+									this.drawTexturedModalRect(x-2, y+1+spacing, crosshair.getLocX()+5, crosshair.getLocY()+9, 5, 6);
+									
+									break;
+								case HORIZONTAL:
+									this.drawTexturedModalRect(x-1, y-1, crosshair.getLocX()+6, crosshair.getLocY()+6, 3, 3);
+									
+									this.drawTexturedModalRect(x-6-spacing, y-7, crosshair.getLocX(), crosshair.getLocY(), 6, 16);
+									this.drawTexturedModalRect(x+1+spacing, y-7, crosshair.getLocX()+9, crosshair.getLocY(), 6, 16);
+									break;
+									
+								case X:
+									this.drawTexturedModalRect(x-1, y-1, crosshair.getLocX()+6, crosshair.getLocY()+6, 3, 3);
+									
+									this.drawTexturedModalRect(x-6-spacing, y-6-spacing, crosshair.getLocX(), crosshair.getLocY(), 6, 6);
+									this.drawTexturedModalRect(x+1+spacing, y-6-spacing, crosshair.getLocX()+9, crosshair.getLocY(), 6, 6);
+									
+									this.drawTexturedModalRect(x-6-spacing, y+1+spacing, crosshair.getLocX(), crosshair.getLocY()+9, 6, 6);
+									this.drawTexturedModalRect(x+1+spacing, y+1+spacing, crosshair.getLocX()+9, crosshair.getLocY()+9, 6, 6);
+									break;
+									
+								case TRI:
+									this.drawTexturedModalRect(x-1, y-1, crosshair.getLocX()+6, crosshair.getLocY()+6, 3, 3);
+									
+									this.drawTexturedModalRect(x-7, y-6-spacing, crosshair.getLocX(), crosshair.getLocY(), 16, 6);
+									
+									this.drawTexturedModalRect(x-6-spacing, y+1+spacing, crosshair.getLocX(), crosshair.getLocY()+9, 6, 6);
+									this.drawTexturedModalRect(x+1+spacing, y+1+spacing, crosshair.getLocX()+9, crosshair.getLocY()+9, 6, 6);
+									break;
+									
+								case TRI_INV:
+								
+									this.drawTexturedModalRect(x-1, y-1, crosshair.getLocX()+6, crosshair.getLocY()+6, 3, 3);
+									
+									this.drawTexturedModalRect(x-6-spacing, y-6-spacing, crosshair.getLocX(), crosshair.getLocY(), 6, 6);
+									this.drawTexturedModalRect(x+1+spacing, y-6-spacing, crosshair.getLocX()+9, crosshair.getLocY(), 6, 6);
+									
+									this.drawTexturedModalRect(x-7, y+1+spacing, crosshair.getLocX(), crosshair.getLocY()+9, 16, 6);
+									
+									break;
+									
+								case VERTICAL:
+									//NYI
+									//break;
+								default:
+									this.drawTexturedModalRect(x-7, y-7, crosshair.getLocX(), crosshair.getLocY(), 16,16);
+									break;
+		                	} 
+		                	 
+		                }
+		                
+		                //do same bind as vanilla afterwards
+		                Minecraft.getMinecraft().getTextureManager().bindTexture(Gui.ICONS);
+				}
+			}
+			
+		}
 		
 	}
 }

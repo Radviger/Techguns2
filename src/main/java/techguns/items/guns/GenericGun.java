@@ -72,6 +72,7 @@ import techguns.packets.GunFiredMessage;
 import techguns.packets.ReloadStartedMessage;
 import techguns.plugins.crafttweaker.EnumGunStat;
 import techguns.util.InventoryUtil;
+import techguns.util.MathUtil;
 import techguns.util.SoundUtil;
 import techguns.util.TextUtil;
 
@@ -130,6 +131,8 @@ public class GenericGun extends GenericItem implements IGenericGun, IItemTGRende
 	
 	int lockOnTicks = 0; //MaximumLockOnTime
 	int lockOnPersistTicks = 0;
+	
+	EnumCrosshairStyle crossHairStyle = EnumCrosshairStyle.GUN_DYNAMIC;
 	
 	public ArrayList<ResourceLocation> textures;
 	
@@ -552,7 +555,16 @@ public class GenericGun extends GenericItem implements IGenericGun, IItemTGRende
 			        	 * If SERVER, create projectile
 			        	 */
 			        	
-			        	float accuracybonus = 1.0f-GenericArmor.getArmorBonusForPlayer(player, TGArmorBonus.GUN_ACCURACY,false);
+			        	float accuracybonus = MathUtil.clamp(1.0f-GenericArmor.getArmorBonusForPlayer(player, TGArmorBonus.GUN_ACCURACY,false), 0f,1f);
+			        	
+			        	//add spread penalty when shooting while blocking
+			        	if(hand== EnumHand.MAIN_HAND && player.isActiveItemStackBlocking()) {
+			        		if(this.handType==GunHandType.ONE_HANDED) {
+			        			accuracybonus *= 4.0f;
+			        		} else {
+			        			accuracybonus *= 8.0f;
+			        		}
+			        	}
 			        	
 			        	EnumBulletFirePos firePos;
 			        	if ((hand == EnumHand.MAIN_HAND && player.getPrimaryHand() == EnumHandSide.RIGHT) || (hand == EnumHand.OFF_HAND && player.getPrimaryHand() == EnumHandSide.LEFT)) {
@@ -777,12 +789,13 @@ public class GenericGun extends GenericItem implements IGenericGun, IItemTGRende
 			stack.setTagCompound(tags);
 		
 			int dmg = stack.getItemDamage();
-			
 			tags.setByte("camo", (byte) 0);
 			tags.setString("ammovariant", AmmoTypes.TYPE_DEFAULT);
 			tags.setShort("ammo", dmg==0 ? (short)this.clipsize : (short)(this.clipsize-dmg));
 			stack.setItemDamage(0);
 			this.addInitialTags(tags);
+		} else {
+			stack.setItemDamage(0);
 		}
 	}
 	
@@ -1628,8 +1641,32 @@ public class GenericGun extends GenericItem implements IGenericGun, IItemTGRende
 		case GRAVITY:
 			this.gravity=value;
 			return true;
+		case SPREAD:
+			this.spread=value;
+			return true;
 		default:
 			return false;
 		}
+	}
+
+	public float getSpread() {
+		return spread;
+	}
+
+	public GunHandType getHandType() {
+		return handType;
+	}
+
+	public float getZoombonus() {
+		return zoombonus;
+	}
+
+	public EnumCrosshairStyle getCrossHairStyle() {
+		return this.crossHairStyle;
+	}
+	
+	public GenericGun setCrossHair(EnumCrosshairStyle crosshair) {
+		this.crossHairStyle = crosshair;
+		return this;
 	}
 }

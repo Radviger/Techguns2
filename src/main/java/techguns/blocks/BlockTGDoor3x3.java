@@ -3,6 +3,8 @@ package techguns.blocks;
 import java.util.List;
 import java.util.Random;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.material.EnumPushReaction;
@@ -23,7 +25,10 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.IStringSerializable;
 import net.minecraft.util.Mirror;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.Rotation;
+import net.minecraft.util.SoundCategory;
+import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
@@ -32,6 +37,7 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.event.RegistryEvent.Register;
 import net.minecraftforge.fml.common.registry.GameRegistry;
+import techguns.TGSounds;
 import techguns.Techguns;
 import techguns.events.TechgunsGuiHandler;
 import techguns.items.ItemTGDoor3x3;
@@ -92,7 +98,7 @@ public class BlockTGDoor3x3<T extends Enum<T> & IStringSerializable> extends Gen
     @Override
 	public void registerBlock(Register<Block> event) {
 		super.registerBlock(event);
-		GameRegistry.registerTileEntity(Door3x3TileEntity.class, Techguns.MODID+":"+"door3x3tileent");
+		GameRegistry.registerTileEntity(Door3x3TileEntity.class, new ResourceLocation(Techguns.MODID,"door3x3tileent"));
 	}
 
     @Override
@@ -288,17 +294,18 @@ public class BlockTGDoor3x3<T extends Enum<T> & IStringSerializable> extends Gen
 			return getBBforPlane(blockState);
 		}
 	}
-
-	  private int getCloseSound()
-	    {
-	        return this.blockMaterial == Material.IRON ? 1011 : 1012;
-	    }
-
-	    private int getOpenSound()
-	    {
-	        return this.blockMaterial == Material.IRON ? 1005 : 1006;
-	    }
 	
+	protected SoundEvent getClosingSound() {
+		return TGSounds.TECHDOOR_CLOSE;
+	}
+	
+	protected SoundEvent getOpeningSound() {
+		return TGSounds.TECHDOOR_OPEN;
+	}
+	
+	protected SoundEvent getStateFinishedSound() {
+		return TGSounds.TECHDOOR_STATE_FINISHED;
+	}
 	    
 	public EnumDoorState getNextOpenState(EnumDoorState current) {
 		switch(current) {
@@ -314,6 +321,20 @@ public class BlockTGDoor3x3<T extends Enum<T> & IStringSerializable> extends Gen
 		}
 	}
 	    
+	@Nullable
+	public SoundEvent getSoundEvent(EnumDoorState nextState) {
+		switch (nextState) {
+		case CLOSING:
+			return this.getClosingSound();
+		case OPENING:
+			return this.getOpeningSound();
+		case CLOSED:
+		case OPENED:
+			return this.getStateFinishedSound();
+		default:
+			return null;
+		}
+	}
 	    
 	public void toggleState(World w, BlockPos masterPos) {
 		toggleState(w, masterPos, true);
@@ -334,8 +355,12 @@ public class BlockTGDoor3x3<T extends Enum<T> & IStringSerializable> extends Gen
 			this.setOpenedStateForBlock(w, p, nextState);
 		}
 		this.setOpenedStateForBlock(w, masterPos, nextState);
-		 w.playEvent((EntityPlayer)null, this.getOpenSound() /*: TODO this.getCloseSound()*/, masterPos, 0);
-		 
+		 //w.playEvent((EntityPlayer)null, this.getOpenSound() /*: TODO this.getCloseSound()*/, masterPos, 0);
+		SoundEvent sound = this.getSoundEvent(nextState);
+		if(sound!=null) {
+			w.playSound(null, masterPos, sound, SoundCategory.BLOCKS, (float) (0.9+Math.random()*0.2), (float) (0.9+Math.random()*0.2));
+		}
+		
 		 TileEntity tile = w.getTileEntity(masterPos);
 		 if(tile!=null && tile instanceof Door3x3TileEntity) {
 			 Door3x3TileEntity door = (Door3x3TileEntity) tile;

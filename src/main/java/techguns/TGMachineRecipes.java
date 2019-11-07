@@ -9,6 +9,7 @@ import net.minecraft.init.Items;
 import net.minecraft.init.PotionTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionUtils;
+import net.minecraft.util.NonNullList;
 import net.minecraftforge.common.brewing.BrewingRecipeRegistry;
 import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fluids.FluidStack;
@@ -45,7 +46,12 @@ public class TGMachineRecipes {
 		
 		ItemStack GOLD_OR_ELECTRUM=ItemStack.EMPTY;
 		if(OreDictionary.doesOreNameExist("ingotElectrum")) {
-			GOLD_OR_ELECTRUM = OreDictionary.getOres("ingotElectrum").get(0);
+			NonNullList<ItemStack> list = OreDictionary.getOres("ingotElectrum");
+			if(!list.isEmpty()) {
+				GOLD_OR_ELECTRUM = list.get(0);
+			} else {
+				GOLD_OR_ELECTRUM = new ItemStack(Items.GOLD_INGOT,1);
+			}
 		} else {
 			GOLD_OR_ELECTRUM = new ItemStack(Items.GOLD_INGOT,1);
 		}
@@ -106,8 +112,8 @@ public class TGMachineRecipes {
 		ChemLabRecipes.addRecipe(TGItems.BIOMASS, 1, new ItemStack(Items.GUNPOWDER), 1, null, 0, new FluidStack(TGFluids.WATER,1000), new FluidStack(TGFluids.ACID,1000), null, true, 20);
 		
 		if (ItemUtil.existsInOredict("itemBioFuel")){
-			ChemLabRecipes.addRecipe("itemBioFuel",4, TGItems.newStack(TGItems.BIO_TANK_EMPTY,1), 1, null, 0, new FluidStack(TGFluids.WATER,500), null, TGItems.newStack(TGItems.BIO_TANK, 1), false, 1);
-			ChemLabRecipes.addRecipe("itemBioFuel",4, new ItemStack(Items.GUNPOWDER), 1, null, 0, new FluidStack(TGFluids.WATER,1000), new FluidStack(TGFluids.ACID,1000), null, false, 20);
+			ChemLabRecipes.addRecipe("itemBioFuel",4, TGItems.newStack(TGItems.BIO_TANK_EMPTY,1), 1, null, 0, new FluidStack(TGFluids.WATER,500), null, TGItems.newStack(TGItems.BIO_TANK, 1), true, 1);
+			ChemLabRecipes.addRecipe("itemBioFuel",4, new ItemStack(Items.GUNPOWDER), 1, null, 0, new FluidStack(TGFluids.WATER,1000), new FluidStack(TGFluids.ACID,1000), null, true, 20);
 				
 		}
 		
@@ -166,7 +172,7 @@ public class TGMachineRecipes {
 		ChemLabRecipes.addRecipe(TGItems.SHOTGUN_ROUNDS, 8, new ItemStack(Items.BLAZE_POWDER), 1, null, 0, new FluidStack(TGFluids.LAVA,250), null, TGItems.newStack(TGItems.SHOTGUN_ROUNDS_INCENDIARY,8), false, 25);
 		
 		ChemLabRecipes.addRecipe( new ItemStack(Items.SUGAR), 4, new ItemStack(Items.SPECKLED_MELON),1,new ItemStack(Items.GLASS_BOTTLE),1, new FluidStack(TGFluids.MILK, 1000), null, new ItemStack(TGItems.RAD_PILLS, 4), true, 20);
-		ChemLabRecipes.addRecipe( new ItemStack(Items.NETHER_WART), 1, new ItemStack(Items.SPECKLED_MELON), 1,TGItems.newStack(TGItems.PLASTIC_BAG, 1),1, new FluidStack(TGFluids.ACID, 250), null, new ItemStack(TGItems.RAD_AWAY, 1), true, 25);
+		ChemLabRecipes.addRecipe( new ItemStack(Items.NETHER_WART), 1, new ItemStack(Items.SPECKLED_MELON), 1,TGItems.newStack(TGItems.INFUSION_BAG, 1),1, new FluidStack(TGFluids.ACID, 250), null, new ItemStack(TGItems.RAD_AWAY, 1), true, 25);
 		
 		
 		/**
@@ -214,7 +220,7 @@ public class TGMachineRecipes {
 		 * CHARGING STATION
 		 */
 		ChargingStationRecipe.addRecipe(new ItemStackOreDict(TGItems.ENERGY_CELL_EMPTY), TGItems.ENERGY_CELL, 50000);
-		ChargingStationRecipe.addRecipe(new ItemStackOreDict(TGItems.REDSTONE_BATTERY_EMPTY), TGItems.REDSTONE_BATTERY, 10000);
+		ChargingStationRecipe.addRecipe(new ItemStackOreDict(TGItems.REDSTONE_BATTERY_EMPTY), TGItems.REDSTONE_BATTERY, 20000);
 		
 		
 		/**
